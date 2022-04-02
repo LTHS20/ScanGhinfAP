@@ -9,13 +9,17 @@ package ltd.lths.wireless.ghinf.ap.util
  */
 data class SSID(
     val id: String,
-    val password: String,
-    val encryption: Encryption,
-    val frequency: Frequency
+    val password: String = "",
+    val encryption: Encryption = Encryption.NONE,
+    val frequency: Frequency = Frequency.WLAN_2G,
+    val hide: Boolean = false,
+    val vlan: Int = 0,
+    val property: Map<String, String> = mapOf()
 ) {
 
     enum class Encryption(val alia: String) {
         NONE("none"),
+        WPA_TKIP("psk"),
         WPA2_PSK2("psk2"),
         WPA2_MIXED("psk2-mixed"),
         UNKNOWN("Unknown")

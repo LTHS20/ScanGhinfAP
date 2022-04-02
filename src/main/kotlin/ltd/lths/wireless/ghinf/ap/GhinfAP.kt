@@ -4,12 +4,13 @@ import com.google.gson.JsonParser
 import ltd.lths.wireless.ghinf.ap.api.toIPv4
 import ltd.lths.wireless.ghinf.ap.util.IPv4
 import ltd.lths.wireless.ghinf.ap.util.SSID
+import org.apache.http.HttpHost
 import org.apache.http.client.config.CookieSpecs
 import org.apache.http.client.config.RequestConfig
+import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
-import org.apache.http.message.BasicHeader
 import org.apache.http.util.EntityUtils
 import org.jsoup.Jsoup
 
@@ -26,19 +27,23 @@ class GhinfAP private constructor(
     val password: String = "admin"
     ) {
 
-    val client = HttpClients.custom()
-        .setDefaultRequestConfig(RequestConfig.custom()
-        .setCookieSpec(CookieSpecs.STANDARD).build())
+    val client get() = HttpClients.custom()
+        .setDefaultRequestConfig(
+            RequestConfig.custom()
+                .setCookieSpec(CookieSpecs.STANDARD)
+                .build()
+        )
+        .setProxy(HttpHost("127.0.0.1",8888))
         .build()
 
     var cookie: String?
 
     val host get() = "$ipv4:$port"
     val deriveName: String get() {
-        val post = HttpPost("http://$host/ac/")
-        post.setHeader("Cookie", cookie)
+        val get = HttpGet("http://$host/ac/")
+        get.setHeader("Cookie", cookie)
 
-        val response = client.execute(post)
+        val response = client.execute(get)
 
         val doc = Jsoup.parse(EntityUtils.toString(response.entity))
         doc.getElementsByClass("am-form-group").forEach {
@@ -51,51 +56,76 @@ class GhinfAP private constructor(
         return "获取失败"
     }
 
+    var ssids: MutableList<SSID>
+        get() {
+            val get = HttpGet("http://$host/multissid/")
+            get.setHeader("Cookie", cookie)
+
+            val response = client.execute(get)
+            val doc = Jsoup.parse(EntityUtils.toString(response.entity))
+
+            return doc.getElementsByClass("even").map {
+                val td = it.getElementsByTag("td")
+                val id = td[0].text()
+                val pwd = td[2].text().let { if (it == "无密码") "" else it }
+                val encryption = when (td[1].text()) {
+                    "无加密" -> SSID.Encryption.NONE
+                    "WPAPSK-TKIP" -> SSID.Encryption.WPA_TKIP
+                    "WPAPSK2-AES" -> SSID.Encryption.WPA2_PSK2
+                    "WPA2-Mixed" -> SSID.Encryption.WPA2_MIXED
+                    else -> SSID.Encryption.UNKNOWN
+                }
+                val frequency = when (td[4].text()) {
+                    "2.4G" -> SSID.Frequency.WLAN_2G
+                    "5G" -> SSID.Frequency.WLAN_5G
+                    else -> SSID.Frequency.WLAN_2G
+                }
+                val hide = td[3].text() == "Yes"
+                val vlan = td[5].text().let { if (it == "默认VLAN") 0 else it.toInt() }
+                val removeId = it.getElementsByClass("tpl-table-black-operation-del").first()!!.attr("href").substringAfterLast("&id=")
+
+                SSID(id, pwd, encryption, frequency, hide, vlan, mapOf("removeid" to removeId))
+            }.toMutableList()
+        }
+        set(value) {
+            ssids.reversed().forEach {
+                removeSsid(it)
+            }
+            value.forEach {
+                addSsid(it)
+            }
+        }
+
+    init {
+        cookie = login()
+    }
+
     fun addSsid(ssid: SSID) {
         val post = HttpPost("http://$host/multissid/")
         post.setHeader("Cookie", cookie)
         post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
-        post.entity = StringEntity("mode=${ssid.frequency.mode}&ssid=&encryption=${ssid.encryption}&key=&auth_server=&auth_port=&auth_secret=&hidden=0&auth=0&res=619.9494729789706&op=add&vlan=0")
+        post.entity = StringEntity("mode=${ssid.frequency.mode}&ssid=${ssid.id}&encryption=${ssid.encryption.alia}&key=${ssid.password}&auth_server=&auth_port=&auth_secret=&hidden=${ssid.hide.compareTo(false)}&auth=0&res=${Math.random() * 1000}&op=add&vlan=${ssid.vlan}", Charsets.UTF_8)
 
-        val response = client.execute(post)
-
-        val doc = Jsoup.parse(EntityUtils.toString(response.entity).also { println(it) })
+        client.execute(post)
     }
 
-    val ssids: Set<SSID> get() {
-        val post = HttpPost("http://$host/multissid/")
-        post.setHeaders(arrayOf(
-            BasicHeader("Host", "127.0.0.1:6997"),
-            BasicHeader("Connection", "keep-alive"),
-            BasicHeader("sec-ch-ua", "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Microsoft Edge\";v=\"99\""),
-            BasicHeader("sec-ch-ua-mobile", "?0"),
-            BasicHeader("sec-ch-ua-platform", "\"Windows\""),
-            BasicHeader("Upgrade-Insecure-Requests", "1"),
-            BasicHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.74 Safari/537.36 Edg/99.0.1150.46"),
-            BasicHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"),
-            BasicHeader("Sec-Fetch-Site", "same-origin"),
-            BasicHeader("Sec-Fetch-Mode", "navigate"),
-            BasicHeader("Sec-Fetch-User", "?1"),
-            BasicHeader("Sec-Fetch-Dest", "document"),
-            BasicHeader("Referer", "http://127.0.0.1:6997/multissid/"),
-            BasicHeader("Accept-Encoding", "gzip, deflate, br"),
-            BasicHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"),
-            BasicHeader("Cookie", "_app_=eyJ1c2VyIjp7InVzZXJuYW1lIjoiYWRtaW4iLCJ1c2VyaWQiOjEwMCwiY3JlYXRlX3RpbWUiOiIifX0.")
-        ))
+    fun removeSsid(ssid: SSID) =
+        removeSsid(ssid.property["removeid"]!!)
 
-        val response = client.execute(post)
+    fun removeSsid(removeId: String) {
+        val get = HttpGet("http://$host/multissid/del?op=del&id=$removeId")
+        get.setHeader("Cookie", cookie)
 
-        println(response.statusLine)
-
-        val doc = Jsoup.parse(EntityUtils.toString(response.entity).also { println(it) })
-
-
-        return setOf()
+        client.execute(get)
     }
 
-    init {
-        cookie = login()
+    fun confirmSsids() {
+        val post = HttpPost("http://$host/multissid/confirm")
+        post.setHeader("Cookie", cookie)
+        post.setHeader("Accept", "application/json, text/javascript, */*; q=0.01")
+
+        client.execute(post)
     }
 
     fun login(): String? {

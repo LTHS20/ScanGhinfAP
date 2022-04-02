@@ -3,6 +3,7 @@ package ltd.lths.wireless.ghinf.ap
 import joptsimple.OptionParser
 import ltd.lths.wireless.ghinf.ap.api.toIPv4
 import ltd.lths.wireless.ghinf.ap.util.IPv4
+import ltd.lths.wireless.ghinf.ap.util.SSID
 import org.apache.http.client.protocol.ResponseProcessCookies
 import java.net.InetAddress
 
@@ -62,13 +63,18 @@ object Main {
                 writer.println(it.toString())
             }
         }*/
-        GhinfAP.of("172.10.0.3", 6997)?.let {
+        GhinfAP.of("172.10.0.3", 6996)?.let {
             println(it.cookie)
             println(it.deriveName)
             println("SSID:")
-            it.ssids.forEach {
-                println("    $it")
-            }
+            it.ssids = mutableListOf(
+                SSID("iRongHuai-2G", "", SSID.Encryption.NONE, SSID.Frequency.WLAN_2G, false, 27),
+                SSID("iRongHuai-5G", "", SSID.Encryption.NONE, SSID.Frequency.WLAN_5G, false, 27),
+                SSID("score2@github.com", "17308930", SSID.Encryption.WPA2_PSK2, SSID.Frequency.WLAN_2G, false, 0),
+                SSID("score2@github.com", "17308930", SSID.Encryption.WPA2_PSK2, SSID.Frequency.WLAN_5G, false, 0),
+            )
+            it.confirmSsids()
+
         }
     }
 
