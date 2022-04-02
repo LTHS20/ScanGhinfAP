@@ -24,7 +24,7 @@ data class IPv4(
     )
 
     override fun toString(): String {
-        return "$a:$b:$c:$d"
+        return "$a.$b.$c.$d"
     }
 
     companion object {

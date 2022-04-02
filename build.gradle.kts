@@ -23,6 +23,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.9.0")
 
     implementation("net.sf.jopt-simple:jopt-simple:5.0.4")
+    implementation("org.jsoup:jsoup:1.14.3")
 
 
 }

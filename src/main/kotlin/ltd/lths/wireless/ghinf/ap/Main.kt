@@ -1,8 +1,10 @@
 package ltd.lths.wireless.ghinf.ap
 
 import joptsimple.OptionParser
+import ltd.lths.wireless.ghinf.ap.api.toIPv4
 import ltd.lths.wireless.ghinf.ap.util.IPv4
-import java.io.File
+import org.apache.http.client.protocol.ResponseProcessCookies
+import java.net.InetAddress
 
 /**
  * ScanGhinfAP
@@ -60,6 +62,14 @@ object Main {
                 writer.println(it.toString())
             }
         }*/
+        GhinfAP.of("172.10.0.3", 6997)?.let {
+            println(it.cookie)
+            println(it.deriveName)
+            println("SSID:")
+            it.ssids.forEach {
+                println("    $it")
+            }
+        }
     }
 
 }
