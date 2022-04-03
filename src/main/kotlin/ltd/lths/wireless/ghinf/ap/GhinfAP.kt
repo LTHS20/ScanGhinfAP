@@ -27,19 +27,11 @@ class GhinfAP private constructor(
     val password: String = "admin"
     ) {
 
-    val client get() = HttpClients.custom()
-        .setDefaultRequestConfig(
-            RequestConfig.custom()
-                .setCookieSpec(CookieSpecs.STANDARD)
-                .build()
-        )
-        .setProxy(HttpHost("127.0.0.1",8888))
-        .build()
 
-    var cookie: String?
+    var cookie: String? = null
 
     val host get() = "$ipv4:$port"
-    val deriveName: String get() {
+    val deriveName: String by lazy {
         val get = HttpGet("http://$host/ac/")
         get.setHeader("Cookie", cookie)
 
@@ -50,10 +42,10 @@ class GhinfAP private constructor(
             it.getElementsByClass("am-u-md-3 am-u-xs-12 am-form-label").find { element -> element.text().toString() == "设备名称" }
                 ?: return@forEach
 
-            return it.getElementsByClass("am-form-field tpl-form-no-bg").first()!!.attr("value")
+            return@lazy it.getElementsByClass("am-form-field tpl-form-no-bg").first()!!.attr("value")
         }
 
-        return "获取失败"
+        return@lazy "获取失败"
     }
 
     var ssids: MutableList<SSID>
@@ -88,11 +80,23 @@ class GhinfAP private constructor(
             }.toMutableList()
         }
         set(value) {
-            ssids.reversed().forEach {
+            val removes = mutableListOf<SSID>()
+            // 保留已存在的ssid
+            ssids.reversed().forEach { ssid ->
+                if (value.any { it == ssid }) {
+                    return@forEach
+                }
+                removes.add(ssid)
+            }
+            removes.forEach {
                 removeSsid(it)
             }
-            value.forEach {
-                addSsid(it)
+
+            value.forEach { ssid ->
+                if (ssids.any { it == ssid }) {
+                    return@forEach
+                }
+                addSsid(ssid)
             }
         }
 
@@ -145,6 +149,35 @@ class GhinfAP private constructor(
 
     companion object {
 
+        val client get() = HttpClients.custom()
+            .setDefaultRequestConfig(
+                RequestConfig.custom()
+                    .setCookieSpec(CookieSpecs.STANDARD)
+                    .build()
+            )
+            .build()
+
+        fun idGhinfAP(ipv4: IPv4, port: Int = 80): Boolean {
+            kotlin.runCatching {
+                val post = HttpPost("http://$ipv4:$port/login")
+                post.config = RequestConfig.custom()
+                    .setCookieSpec(CookieSpecs.STANDARD)
+                    .setConnectionRequestTimeout(500)
+                    .setConnectTimeout(50)
+                    .setSocketTimeout(500)
+                    .build()
+                post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+
+                post.entity = StringEntity("username=admin&password=admin&lang=zh-CN", Charsets.UTF_8)
+
+                val response = client.execute(post)
+                JsonParser.parseString(EntityUtils.toString(response.entity)).asJsonObject.get("success").asBoolean
+
+                return true
+            }
+
+            return false
+        }
 
         fun of(host: String, port: Int = 80, password: String = "admin") =
             of(host.toIPv4, port, password)

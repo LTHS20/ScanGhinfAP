@@ -8,14 +8,25 @@ package ltd.lths.wireless.ghinf.ap.util
  * @since 2022/04/02 15:12
  */
 data class SSID(
-    val id: String,
-    val password: String = "",
-    val encryption: Encryption = Encryption.NONE,
-    val frequency: Frequency = Frequency.WLAN_2G,
-    val hide: Boolean = false,
-    val vlan: Int = 0,
-    val property: Map<String, String> = mapOf()
+    var id: String,
+    var password: String = "",
+    var encryption: Encryption = Encryption.NONE,
+    var frequency: Frequency = Frequency.WLAN_2G,
+    var hide: Boolean = false,
+    var vlan: Int = 0,
+    var property: Map<String, String> = mapOf()
 ) {
+
+    override fun equals(other: Any?): Boolean {
+        val ssid = other as? SSID ?: return false
+        return ssid.id == id
+                && ssid.password == password
+                && ssid.encryption == encryption
+                && ssid.frequency == frequency
+                && ssid.hide == hide
+                && ssid.vlan == vlan
+                && ssid.property == property
+    }
 
     enum class Encryption(val alia: String) {
         NONE("none"),
