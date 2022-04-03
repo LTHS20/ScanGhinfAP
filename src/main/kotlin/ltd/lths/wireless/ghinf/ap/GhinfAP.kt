@@ -13,6 +13,7 @@ import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.util.EntityUtils
 import org.jsoup.Jsoup
+import java.util.concurrent.CompletableFuture
 
 /**
  * ScanGhinfAP
@@ -88,15 +89,31 @@ class GhinfAP private constructor(
                 }
                 removes.add(ssid)
             }
-            removes.forEach {
-                removeSsid(it)
+            removes.forEach { ssid ->
+                kotlin.runCatching {
+                    removeSsid(ssid)
+                }.onFailure {
+                    println("!错误! 为 $deriveName 移除 ${ssid.id} 超时, 正在重试.")
+                    CompletableFuture.runAsync {
+                        ssids = value
+                    }
+                    return@forEach
+                }
             }
 
             value.forEach { ssid ->
                 if (ssids.any { it == ssid }) {
                     return@forEach
                 }
-                addSsid(ssid)
+                kotlin.runCatching {
+                    addSsid(ssid)
+                }.onFailure {
+                    println("!错误! 为 $deriveName 添加 ${ssid.id} 超时, 正在重试.")
+                    CompletableFuture.runAsync {
+                        ssids = value
+                    }
+                    return@forEach
+                }
             }
         }
 
@@ -153,6 +170,9 @@ class GhinfAP private constructor(
             .setDefaultRequestConfig(
                 RequestConfig.custom()
                     .setCookieSpec(CookieSpecs.STANDARD)
+                    .setConnectionRequestTimeout(5000)
+                    .setConnectTimeout(5000)
+                    .setSocketTimeout(5000)
                     .build()
             )
             .build()
