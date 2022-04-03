@@ -89,8 +89,8 @@ object Main {
             skips = options.valueOf("skip").toString().split("\\s*,\\s*".toRegex())
         }
         if (options.has("wifi")) {
-            ssids = options.valuesOf("wifi").toString().flatMap {
-                val format = it.toString().split("/")
+            ssids = options.valueOf("wifi").toString().let {
+                val format = it.split("/")
                 listOf(
                     SSID(format[0], format.getOrNull(1) ?: "", SSID.Encryption.WPA2_PSK2, SSID.Frequency.WLAN_2G),
                     SSID(format[0], format.getOrNull(1) ?: "", SSID.Encryption.WPA2_PSK2, SSID.Frequency.WLAN_5G),
@@ -99,29 +99,31 @@ object Main {
         }
 
         val ghinfaps = mutableMapOf<String, GhinfAP>()
+        val covered = mutableSetOf<String>()
 
-        var outLength = 0
-        fun find(iPv4: IPv4): GhinfAP {
+        fun find(iPv4: IPv4, log: Boolean = true): GhinfAP {
             val ap = GhinfAP.of(iPv4, port, password)
             val name = ap!!.deriveName
             ghinfaps[name] = ap
-            println("找到GhinF AP 设备 ${ap.host}@$name")
+            if (log) println("找到GhinF AP 设备 ${ap.host}@$name")
             return ap
         }
+        var outLength = 0
+        var tasking: CompletableFuture<Void>? = null
         when {
             options.has("scan") -> {
                 println("开始搜寻")
 
                 ips.forEach {
-                    val out = "正在尝试IP: $it:$port"
-                    outLength = out.length
-                    print(out)
+                    print("正在尝试IP: $it:$port     ".also { outLength = it.length })
                     if (!GhinfAP.idGhinfAP(it)) {
-
                         (0..outLength * 2).forEach { _ ->
                             print("\b")
                         }
                         return@forEach
+                    }
+                    (0..outLength * 2).forEach { _ ->
+                        print("\b")
                     }
                     println()
 
@@ -131,29 +133,48 @@ object Main {
 
             }
             options.has("cover") -> {
-                println("开始地毯式覆盖 $ssids")
+                println("开始地毯式覆盖")
                 println("过滤器: ${skips.joinToString()}")
 
                 ips.forEach {
+                    print("正在尝试IP: $it:$port     ".also { outLength = it.length })
                     if (!GhinfAP.idGhinfAP(it)) {
+                        (0..outLength * 2).forEach { _ ->
+                            print("\b")
+                        }
                         return@forEach
                     }
+                    (0..outLength * 2).forEach { _ ->
+                        print("\b")
+                    }
                     kotlin.runCatching {
-                        val ap = find(it)
+                        val ap = find(it, false)
+
+                        tasking?.get()
+                        println("找到GhinF AP 设备 ${ap.host}@${ap.deriveName}")
+
+                        if (covered.contains(ap.deriveName)) {
+                            println("    已覆盖该 AP ${ap.deriveName}, 跳过")
+                            return@runCatching
+                        }
                         if (skips.any { ap.deriveName.contains(it) }) {
                             println("    已跳过该 AP")
-                            return
+                            return@runCatching
                         }
-                        ap.ssids = ap.ssids.also {
-                            it.removeIf { origin -> ssids.any { it.id == origin.id } }
-                            it.forEach {
-                                println("      ${it.id}<${it.frequency}> & ${it.encryption}")
-                            }
-                            ssids.forEach {
-                                ap.addSsid(it)
-                                println("    + ${it.id}<${it.frequency}> & ${it.encryption}")
+                        tasking = CompletableFuture.runAsync {
+                            ap.ssids = ap.ssids.also {
+                                it.removeAll { it.id.contains("[") }
+                                it.removeIf { origin -> ssids.any { it.id == origin.id } }
+                                it.forEach {
+                                    println("      ${it.id}<${it.frequency}> & ${it.encryption}")
+                                }
+                                ssids.forEach {
+                                    ap.addSsid(it)
+                                    println("    + ${it.id}<${it.frequency}> & ${it.encryption}")
+                                }
                             }
                         }
+                        covered.add(ap.deriveName)
 
                     }
                 }
