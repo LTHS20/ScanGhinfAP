@@ -26,6 +26,11 @@ object Main {
                     .ofType(String::class.java)
                     .defaultsTo("172.10-25.*.*")
                     .describedAs("ip段")
+                acceptsAll(listOf("port", "p"), "自定义端口")
+                    .withRequiredArg()
+                    .ofType(String::class.java)
+                    .defaultsTo("80")
+                    .describedAs("端口号")
                 acceptsAll(listOf("password", "pwd"), "自定义管理员密码")
                     .withRequiredArg()
                     .ofType(String::class.java)
@@ -63,6 +68,7 @@ object Main {
         println("ScanGhinfAP 运行中...")
 
         var ips: List<IPv4> = listOf(IPv4("172.10.0.1"))
+        var port = 80
         var password = "admin"
         var skips: List<String> = listOf()
         var ssids: List<SSID> = listOf()
@@ -72,6 +78,9 @@ object Main {
             println("正在遍历ip段...")
             ips = IPv4.from(options.valueOf("ip").toString()).toList()
             println("ip已生成 ${ips.size} 个")
+        }
+        if (options.has("port")) {
+            port = options.valueOf("port").toString().toInt()
         }
         if (options.has("pwd")) {
             password = options.valueOf("pwd").toString()
@@ -91,8 +100,9 @@ object Main {
 
         val ghinfaps = mutableMapOf<String, GhinfAP>()
 
+        var outLength = 0
         fun find(iPv4: IPv4): GhinfAP {
-            val ap = GhinfAP.of(iPv4, password = password)
+            val ap = GhinfAP.of(iPv4, port, password)
             val name = ap!!.deriveName
             ghinfaps[name] = ap
             println("找到GhinF AP 设备 ${ap.host}@$name")
@@ -103,9 +113,18 @@ object Main {
                 println("开始搜寻")
 
                 ips.forEach {
+                    val out = "正在尝试IP: $it:$port"
+                    outLength = out.length
+                    print(out)
                     if (!GhinfAP.idGhinfAP(it)) {
+
+                        (0..outLength * 2).forEach { _ ->
+                            print("\b")
+                        }
                         return@forEach
                     }
+                    println()
+
                     kotlin.runCatching { find(it) }
                 }
 

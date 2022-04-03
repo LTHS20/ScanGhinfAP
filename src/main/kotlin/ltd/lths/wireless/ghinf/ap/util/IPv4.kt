@@ -29,7 +29,7 @@ data class IPv4(
 
     companion object {
 
-        val range = (0..255)
+        val range = (1..254)
 
         fun List<Int>.flat() =
             mapNotNull { if (!range.contains(it)) null else it }
