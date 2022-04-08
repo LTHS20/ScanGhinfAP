@@ -114,7 +114,7 @@ object Main {
         var outLength: Int
         var printing = false
         when {
-            options.has("scan") -> {
+/*            options.has("scan") -> {
                 println("开始搜寻")
 
                 val logFile = File("scan-log.txt")
@@ -143,11 +143,14 @@ object Main {
                 logWriter.close()
 
 
-            }
-            options.has("cover") -> {
-                println("开始地毯式覆盖 WIFI")
-                ssids.forEach {
-                    println("+ [${it.frequency.name.removePrefix("WLAN_")}]${it.id}")
+            }*/
+            options.has("scan") || options.has("cover") -> {
+                println("开始扫描")
+                if (options.has("cover")) {
+                    println("需要覆盖的 WIFI 列表:")
+                    ssids.forEach {
+                        println("+ [${it.frequency.ghz}]${it.id}")
+                    }
                 }
                 println("过滤器: ${skips.joinToString()}")
 
@@ -157,7 +160,7 @@ object Main {
                 val logWriter = logFile.printWriter()
 
                 val iterator = ips.iterator()
-                val threadCount = 8
+                val threadCount = 12
                 val thread: MutableList<Pair<IPv4, CompletableFuture<GhinfAP?>>?> = mutableListOf()
                 repeat(threadCount) {
                     println()
@@ -174,8 +177,7 @@ object Main {
                     print("\u001B[s")
                 }
                 fun cover(ap: GhinfAP) {
-                    var out = "找到GhinF AP 设备 ${ap.deriveName}@${ap.host}\n"
-
+                    var out = "已找到 GhinF AP 设备 ${ap.deriveName}@${ap.host}\n"
 
                     if (covered.contains(ap.deriveName)) {
                         out += "    已覆盖该 AP ${ap.deriveName}, 跳过\n"
@@ -190,10 +192,10 @@ object Main {
                         it.removeIf { origin -> ssids.any { it.id == origin.id } }
                         it.addAll(ssids)
                         it.forEach {
-                            out += "      ${it.id}<${it.frequency}> & ${it.encryption}\n"
+                            out += "      ${it.id}<${it.frequency.ghz}> & ${it.encryption}\n"
                         }
                         ssids.forEach {
-                            out += "    + ${it.id}<${it.frequency}> & ${it.encryption}\n"
+                            out += "    + ${it.id}<${it.frequency.ghz}> & ${it.encryption}\n"
                         }
                     }
                     logWriter.println("${ap.deriveName}@${ap.host} | ${ap.ssids.joinToString { it.id }}")
@@ -201,7 +203,7 @@ object Main {
                     covered.add(ap.deriveName)
 
                     printing = true
-                    print("\u001B[u$out")
+                    print("\u001B[u${out.split("\n").joinToString("                       \n")}")
                     calibration()
                     printing = false
                 }
@@ -213,17 +215,25 @@ object Main {
                         }
                         if (c?.second?.isDone == true) {
                             val ap = c.second.get()
-                            if (ap != null) {
-                                kotlin.runCatching {
-                                    CompletableFuture.runAsync {
-                                        cover(ap)
+                            if (options.has("cover")) {
+                                if (ap != null) {
+                                    kotlin.runCatching {
+                                        CompletableFuture.runAsync {
+                                            cover(ap)
+                                        }
                                     }
+                                    thread[i] = null
+                                    return@forEachIndexed
                                 }
-                                thread[i] = null
-                                return@forEachIndexed
                             } else {
-                                thread[i] = null
+                                if (ap != null) {
+                                    printing = true
+                                    println("\u001B[u[$i] ${ap.deriveName}@${ap.host}                          ")
+                                    calibration()
+                                    printing = false
+                                }
                             }
+                            thread[i] = null
                         }
                         if (c == null) {
                             val ipv4 = iterator.next()
@@ -240,9 +250,9 @@ object Main {
                     var out = "\u001B[u<==================== 线程数: $threadCount ====================>\n"
                     thread.forEachIndexed { i, c ->
                         out += if (c == null) {
-                            "[线程 $i] ---                                                     \n"
+                            "[线程 ${i.plus(1)}] ---                                               \n"
                         } else {
-                            "[线程 $i] 正在尝试通过 IP ${c.first}:$port 获取 GhinF AP        \n"
+                            "[线程 ${i.plus(1)}] 正在扫描 IP ${c.first}:$port        \n"
                         }
                     }
                     out.removeSuffix("\n")
@@ -250,6 +260,7 @@ object Main {
                     if (!printing) print(out)
 
                 }
+                calibration()
             }
         }
 

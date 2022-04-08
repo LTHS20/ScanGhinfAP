@@ -37,8 +37,9 @@ data class SSID(
         ;
     }
 
-    enum class Frequency(val mode: Int) {
-        WLAN_2G(0),
-        WLAN_5G(1),
+    enum class Frequency(val mode: Int, val ghz: String) {
+        WLAN_2G(0, "2.4G"),
+        WLAN_5G(1, "5G"),
+        ;
     }
 }
