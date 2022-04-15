@@ -158,7 +158,7 @@ class GhinfAP private constructor(
         val response = client.execute(post)
 
         if (!JsonParser.parseString(EntityUtils.toString(response.entity)).asJsonObject.get("success").asBoolean) {
-            return null
+            return "_app_=eyJ1c2VyIjp7InVzZXJuYW1lIjoiYWRtaW4iLCJ1c2VyaWQiOjEwMCwiY3JlYXRlX3RpbWUiOiIifX0." // 也许是冠航ap固件的bug, 无论它怎么改密码, cookie 都是这个
         }
 
         return response.getLastHeader("Set-Cookie").value.substringBefore(";").also { cookie = it }
