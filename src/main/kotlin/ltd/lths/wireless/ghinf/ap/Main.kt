@@ -1,13 +1,10 @@
 package ltd.lths.wireless.ghinf.ap
 
 import joptsimple.OptionParser
-import ltd.lths.wireless.ghinf.ap.api.toIPv4
 import ltd.lths.wireless.ghinf.ap.util.IPv4
 import ltd.lths.wireless.ghinf.ap.util.SSID
-import trplugins.menu.util.concurrent.TaskConcurrent
 import java.io.File
 import java.util.concurrent.CompletableFuture
-import kotlin.math.log
 
 /**
  * ScanGhinfAP
@@ -34,6 +31,11 @@ object Main {
                     .ofType(String::class.java)
                     .defaultsTo("80")
                     .describedAs("端口号")
+                acceptsAll(listOf("thread", "t"), "自定义线程数")
+                    .withRequiredArg()
+                    .ofType(String::class.java)
+                    .defaultsTo("12")
+                    .describedAs("线程数")
                 acceptsAll(listOf("password", "pwd"), "自定义管理员密码")
                     .withRequiredArg()
                     .ofType(String::class.java)
@@ -72,6 +74,7 @@ object Main {
 
         var ips: List<IPv4> = listOf(IPv4("172.10.0.1"))
         var port = 80
+        var thread = 12
         var password = "admin"
         var skips: List<String> = listOf()
         var ssids: List<SSID> = listOf()
@@ -84,6 +87,9 @@ object Main {
         }
         if (options.has("port")) {
             port = options.valueOf("port").toString().toInt()
+        }
+        if (options.has("thread")) {
+            thread = options.valueOf("thread").toString().toInt()
         }
         if (options.has("pwd")) {
             password = options.valueOf("pwd").toString()
@@ -160,18 +166,17 @@ object Main {
                 val logWriter = logFile.printWriter()
 
                 val iterator = ips.iterator()
-                val threadCount = 12
-                val thread: MutableList<Pair<IPv4, CompletableFuture<GhinfAP?>>?> = mutableListOf()
-                repeat(threadCount) {
+                val threadpool: MutableList<Pair<IPv4, CompletableFuture<GhinfAP?>>?> = mutableListOf()
+                repeat(thread) {
                     println()
-                    thread.add(null)
+                    threadpool.add(null)
                 }
 
                 fun calibration() {
-                    repeat(threadCount + 1) {
+                    repeat(thread + 1) {
                         println()
                     }
-                    repeat(threadCount + 1) {
+                    repeat(thread + 1) {
                         print("\u001B[1A")
                     }
                     print("\u001B[s")
@@ -209,7 +214,7 @@ object Main {
                 }
                 calibration()
                 while (iterator.hasNext()) {
-                    thread.forEachIndexed { i, c ->
+                    threadpool.forEachIndexed { i, c ->
                         if (!iterator.hasNext()) {
                             return@forEachIndexed
                         }
@@ -222,7 +227,7 @@ object Main {
                                             cover(ap)
                                         }
                                     }
-                                    thread[i] = null
+                                    threadpool[i] = null
                                     return@forEachIndexed
                                 }
                             } else {
@@ -233,12 +238,12 @@ object Main {
                                     printing = false
                                 }
                             }
-                            thread[i] = null
+                            threadpool[i] = null
                         }
                         if (c == null) {
                             val ipv4 = iterator.next()
 
-                            thread[i] = ipv4 to CompletableFuture.supplyAsync {
+                            threadpool[i] = ipv4 to CompletableFuture.supplyAsync {
                                 if (!GhinfAP.idGhinfAP(ipv4)) {
                                     return@supplyAsync null
                                 }
@@ -247,8 +252,8 @@ object Main {
 
                         }
                     }
-                    var out = "\u001B[u<==================== 线程数: $threadCount ====================>\n"
-                    thread.forEachIndexed { i, c ->
+                    var out = "\u001B[u<==================== 线程数: $thread ====================>\n"
+                    threadpool.forEachIndexed { i, c ->
                         out += if (c == null) {
                             "[线程 ${i.plus(1)}] ---                                               \n"
                         } else {
@@ -282,7 +287,6 @@ object Main {
             println(ap.deriveName)
             println("SSID:")
             ap.ssids = ap.ssids.also {
-                it.removeAll { it.id.contains("[") }
                 it.removeIf { origin -> ssids.any { it.id == origin.id } }
                 it.addAll(ssids)
             }
