@@ -10,7 +10,7 @@ taboolib {
     install(
         "common",
         "common-5",
-        "module-configuration",
+        "module-configuration-shaded",
         "platform-application",
     )
     classifier = null

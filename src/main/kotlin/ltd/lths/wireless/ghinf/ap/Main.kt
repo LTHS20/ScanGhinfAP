@@ -13,6 +13,7 @@ import taboolib.platform.AppExecutor
 import taboolib.platform.AppIO
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import kotlin.system.exitProcess
 
 /**
  * ScanGhinfAP
@@ -23,12 +24,10 @@ import java.util.concurrent.CompletableFuture
  */
 object Main {
 
-    @Config
-    lateinit var config: Configuration
-
     // ansi 控制吗 \u001b
     @JvmStatic
     fun main(args: Array<out String>) {
+        val config = Configuration.loadFromFile(File("config.yml"))
         TabooLibCommon.testSetup()
         val parser = object : OptionParser() {
             init {
@@ -143,6 +142,7 @@ object Main {
         }
 
 
+        exitProcess(0)
     }
 
     fun start(
@@ -210,7 +210,7 @@ object Main {
                 return
             }
             ap.ssids = ap.ssids.also {
-                it.removeAll { it.id.contains("[") }
+                it.removeAll { ssid -> removeSsids.any { it == ssid.id } }
                 it.removeIf { origin -> ssids.any { it.id == origin.id } }
                 it.addAll(ssids)
                 it.forEach {
