@@ -1,4 +1,4 @@
-package trplugins.menu.util.concurrent
+package ltd.lths.wireless.ghinf.ap.util.concurrent
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
