@@ -210,7 +210,10 @@ object Main {
                 return
             }
             ap.ssids = ap.ssids.also {
-                it.removeAll { ssid -> removeSsids.any { it == ssid.id } }
+                it.removeAll { ssid -> removeSsids.any {
+                    if (it.endsWith("*")) ssid.id.contains(it.removeSuffix("*"))
+                    else it == ssid.id
+                } }
                 it.removeIf { origin -> ssids.any { it.id == origin.id } }
                 it.addAll(ssids)
                 it.forEach {
