@@ -25,7 +25,6 @@ data class SSID(
                 && ssid.frequency == frequency
                 && ssid.hide == hide
                 && ssid.vlan == vlan
-                && ssid.property == property
     }
 
     enum class Encryption(val alia: String) {

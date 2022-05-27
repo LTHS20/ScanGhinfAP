@@ -115,6 +115,7 @@ class GhinfAP private constructor(
                     return@forEach
                 }
             }
+            confirmSsids()
         }
 
     init {
@@ -183,7 +184,7 @@ class GhinfAP private constructor(
                 post.config = RequestConfig.custom()
                     .setCookieSpec(CookieSpecs.STANDARD)
                     .setConnectionRequestTimeout(500)
-                    .setConnectTimeout(50)
+                    .setConnectTimeout(500)
                     .setSocketTimeout(500)
                     .build()
                 post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")

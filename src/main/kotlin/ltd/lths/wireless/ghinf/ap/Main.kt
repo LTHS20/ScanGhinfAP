@@ -2,6 +2,7 @@ package ltd.lths.wireless.ghinf.ap
 
 import joptsimple.OptionParser
 import ltd.lths.wireless.ghinf.ap.api.asSection
+import ltd.lths.wireless.ghinf.ap.other.CEE
 import ltd.lths.wireless.ghinf.ap.util.IPv4
 import ltd.lths.wireless.ghinf.ap.util.SSID
 import taboolib.common.TabooLibCommon
@@ -63,6 +64,8 @@ object Main {
                     .defaultsTo("score2@github.com/755466879")
                     .describedAs("名称/密码")
                 acceptsAll(listOf("config", "c"), "根据本地配置文件 config.yml 展开扫描")
+                acceptsAll(listOf("cee"), "高考倒计时(需要配置文件部分项)")
+                acceptsAll(listOf("nolog"), "不记录日志")
 
                 acceptsAll(listOf("test"), "随意调试")
             }
@@ -79,8 +82,7 @@ object Main {
             test()
             return
         }
-
-        if (options.has("config")) {
+        if (options.has("config") || options.has("cee")) {
             println("正在遍历ip段...")
             val ips = config.getStringList("ips").flatMap { IPv4.from(it) }
             println("ip已生成 ${ips.size} 个")
@@ -88,7 +90,7 @@ object Main {
             val thread = config.getInt("thread", 12)
             val password = config.getString("password", "admin")!!
             val skips: List<String> = config.getStringList("skips")
-            val ssids: List<SSID> = config.getList("ssids.cover")!!.map {
+            val ssids: MutableList<SSID> = config.getList("ssids.cover")!!.map {
                 val section = it.asSection()
                 SSID(
                     section.getString("id")!!,
@@ -98,11 +100,34 @@ object Main {
                     section.getBoolean("hide"),
                     section.getInt("vlan")
                 )
-            }
-            val removeSsids = config.getStringList("ssids.remove")
-            println("从配置文件模式开始")
+            }.toMutableList()
+            val removeSsids = config.getStringList("ssids.remove").toMutableList()
 
-            start(ips, port, thread, password, skips, ssids, removeSsids)
+            if (options.has("cee")) {
+                val cachePwd = "asgdhasufg"
+                ssids.add(SSID(
+                    "＃距高考还有 ${CEE.lastDay} 天",
+                    cachePwd,
+                    SSID.Encryption.WPA2_PSK2
+                ))
+                ssids.add(SSID(
+                    "＃请放下手机",
+                    cachePwd,
+                    SSID.Encryption.WPA2_PSK2
+                ))
+                ssids.add(SSID(
+                    "＃人生也许因此转折",
+                    cachePwd,
+                    SSID.Encryption.WPA2_PSK2
+                ))
+                removeSsids.add("＃*")
+
+                println("从配置文件&CEE模式开始")
+            } else {
+                println("从配置文件模式开始")
+            }
+
+            start(ips, port, thread, password, skips, ssids, removeSsids, noLog = options.has("nolog"))
         } else {
             var ips: List<IPv4> = listOf(IPv4("172.10.0.1"))
             var port = 80
@@ -138,7 +163,7 @@ object Main {
                     )
                 }
             }
-            start(ips, port, thread, password, skips, ssids)
+            start(ips, port, thread, password, skips, ssids, noLog = options.has("nolog"))
         }
 
 
@@ -152,7 +177,8 @@ object Main {
         password: String = "admin",
         skips: List<String> = listOf(),
         ssids: List<SSID> = listOf(),
-        removeSsids: List<String> = listOf()
+        removeSsids: List<String> = listOf(),
+        noLog: Boolean = false
     ) {
         val onlyScan = ssids.isEmpty() && removeSsids.isEmpty()
 
@@ -201,15 +227,23 @@ object Main {
         fun cover(ap: GhinfAP) {
             var out = "已找到 GhinF AP 设备 ${ap.deriveName}@${ap.host}\n"
 
-            if (covered.contains(ap.deriveName)) {
+            var cover = true
+
+            if (cover && covered.contains(ap.deriveName)) {
                 out += "    已覆盖该 AP ${ap.deriveName}, 跳过\n"
-                return
+                cover = false
             }
-            if (skips.any { ap.deriveName.contains(it) }) {
+            if (cover && skips.any { ap.deriveName.contains(it) }) {
                 out += "    已跳过该 AP\n"
-                return
+                cover = false
             }
-            ap.ssids = ap.ssids.also {
+            val apSsids = ap.ssids
+            if (cover && apSsids.containsAll(ssids)) {
+                out += "    该 AP 已拥有对应 SSID, 跳过\n"
+                cover = false
+            }
+
+            if (cover) ap.ssids = apSsids.also {
                 it.removeAll { ssid -> removeSsids.any {
                     if (it.endsWith("*")) ssid.id.contains(it.removeSuffix("*"))
                     else it == ssid.id
@@ -223,7 +257,7 @@ object Main {
                     out += "    + ${it.id}<${it.frequency.ghz}> & ${it.encryption}\n"
                 }
             }
-            logWriter.println("${ap.deriveName}@${ap.host} | ${ap.ssids.joinToString { it.id }}")
+            if (!noLog) logWriter.println("${ap.deriveName}@${ap.host} | ${ap.ssids.joinToString { it.id }}")
 
             covered.add(ap.deriveName)
 
