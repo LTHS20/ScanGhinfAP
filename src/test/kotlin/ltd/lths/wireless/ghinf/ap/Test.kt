@@ -27,7 +27,7 @@ object Test {
         val b1 = SSID("b")
         val bl = listOf(b)
 
-        val all = listOf(a, b)
+        val all = listOf(a)
         val all1 = listOf(b, a)
 
         println(all.containsAll(all1))

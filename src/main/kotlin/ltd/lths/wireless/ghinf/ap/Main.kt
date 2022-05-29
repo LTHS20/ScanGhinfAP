@@ -8,6 +8,7 @@ import ltd.lths.wireless.ghinf.ap.util.SSID
 import taboolib.common.TabooLibCommon
 import taboolib.common.platform.PlatformFactory
 import taboolib.common.platform.function.releaseResourceFile
+import taboolib.common.platform.function.submit
 import taboolib.module.configuration.Config
 import taboolib.module.configuration.Configuration
 import taboolib.platform.AppExecutor
@@ -28,8 +29,11 @@ object Main {
     // ansi 控制吗 \u001b
     @JvmStatic
     fun main(args: Array<out String>) {
-        val config = Configuration.loadFromFile(File("config.yml"))
         TabooLibCommon.testSetup()
+        val config = Configuration.loadFromFile(File("config.yml"))
+        submit(async = true, delay = config.getLong("kill-with-tick", 216000)) {
+            exitProcess(0)
+        }
         val parser = object : OptionParser() {
             init {
                 acceptsAll(listOf("?", "help"), "获取帮助")
@@ -120,7 +124,7 @@ object Main {
                     cachePwd,
                     SSID.Encryption.WPA2_PSK2
                 ))
-                removeSsids.add("＃*")
+                removeSsids.add("＃距高考*")
 
                 println("从配置文件&CEE模式开始")
             } else {
@@ -238,7 +242,7 @@ object Main {
                 cover = false
             }
             val apSsids = ap.ssids
-            if (cover && apSsids.containsAll(ssids)) {
+            if (cover && apSsids.containsAll(ssids) || !apSsids.any { removeSsids.contains(it.id) }) {
                 out += "    该 AP 已拥有对应 SSID, 跳过\n"
                 cover = false
             }
